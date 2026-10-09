@@ -60,6 +60,8 @@ bool Lexer::match(char expected) {
 
 // Token scanning functions
 
+// Scan an identifier or keyword.
+
 Token Lexer::scanIdentifier() {
     const std::size_t start = current_;
     const std::size_t startColumn = column_;
@@ -107,6 +109,8 @@ Token Lexer::scanIdentifier() {
         startColumn
     };
 }
+
+// Scan a number literal.
 
 Token Lexer::scanNumber() {
     const std::size_t start = current_;
@@ -162,9 +166,338 @@ Token Lexer::scanNumber() {
     };
 }
 
+// Scan an operator.
+
+Token Lexer::scanOperator() {
+    const std::size_t start = current_;
+    const std::size_t startLine = line_;
+    const std::size_t startColumn = column_;
+
+    const char c = advance();
+
+    switch (c) {
+        case '+':
+            return makeToken(
+                TokenKind::Plus,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case '-':
+            return makeToken(
+                TokenKind::Minus,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case '*':
+            return makeToken(
+                TokenKind::Star,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case '/':
+            return makeToken(
+                TokenKind::Slash,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case '%':
+            return makeToken(
+                TokenKind::Percent,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case '=':
+            if (match('=')) {
+                return makeToken(
+                    TokenKind::EqualEqual,
+                    start,
+                    startLine,
+                    startColumn
+                );
+            }
+
+            return makeToken(
+                TokenKind::Equal,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case '!':
+            if (match('=')) {
+                return makeToken(
+                    TokenKind::BangEqual,
+                    start,
+                    startLine,
+                    startColumn
+                );
+            }
+
+            return makeToken(
+                TokenKind::Bang,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case '<':
+            if (match('=')) {
+                return makeToken(
+                    TokenKind::LessEqual,
+                    start,
+                    startLine,
+                    startColumn
+                );
+            }
+
+            return makeToken(
+                TokenKind::Less,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case '>':
+            if (match('=')) {
+                return makeToken(
+                    TokenKind::GreaterEqual,
+                    start,
+                    startLine,
+                    startColumn
+                );
+            }
+
+            return makeToken(
+                TokenKind::Greater,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case '&':
+            if (match('&')) {
+                return makeToken(
+                    TokenKind::AndAnd,
+                    start,
+                    startLine,
+                    startColumn
+                );
+            }
+
+            throw LexerError(
+                "expected '&' after '&'",
+                startLine,
+                startColumn
+            );
+
+        case '|':
+            if (match('|')) {
+                return makeToken(
+                    TokenKind::OrOr,
+                    start,
+                    startLine,
+                    startColumn
+                );
+            }
+
+            throw LexerError(
+                "expected '|' after '|'",
+                startLine,
+                startColumn
+            );
+
+        default:
+            throw LexerError(
+                "unknown operator",
+                startLine,
+                startColumn
+            );
+    }
+}
+
+// Scan a delimiter.
+
+Token Lexer::scanDelimiter() {
+    const std::size_t start = current_;
+    const std::size_t startLine = line_;
+    const std::size_t startColumn = column_;
+
+    const char c = advance();
+
+    switch (c) {
+        case '(':
+            return makeToken(
+                TokenKind::LParen,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case ')':
+            return makeToken(
+                TokenKind::RParen,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case '{':
+            return makeToken(
+                TokenKind::LBrace,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case '}':
+            return makeToken(
+                TokenKind::RBrace,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case '[':
+            return makeToken(
+                TokenKind::LBracket,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case ']':
+            return makeToken(
+                TokenKind::RBracket,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case ',':
+            return makeToken(
+                TokenKind::Comma,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case ';':
+            return makeToken(
+                TokenKind::Semicolon,
+                start,
+                startLine,
+                startColumn
+            );
+
+        case ':':
+            return makeToken(
+                TokenKind::Colon,
+                start,
+                startLine,
+                startColumn
+            );
+
+        default:
+            throw LexerError(
+                "unknown delimiter",
+                startLine,
+                startColumn
+            );
+    }
+}
+
+// Scan a string literal.
+
+Token Lexer::scanString() {
+    const std::size_t start = current_;
+    const std::size_t startLine = line_;
+    const std::size_t startColumn = column_;
+
+    advance(); // Consume opening quote.
+
+    while (!isAtEnd() && peek() != '"') {
+        if (peek() == '\n' || peek() == '\r') {
+            throw LexerError(
+                "unterminated string",
+                startLine,
+                startColumn
+            );
+        }
+
+        if (peek() == '\\') {
+            advance(); // Consume backslash.
+
+            if (isAtEnd()) {
+                throw LexerError(
+                    "unterminated string",
+                    startLine,
+                    startColumn
+                );
+            }
+
+            const char escaped = advance();
+
+            if (escaped != 'n' &&
+                escaped != 't' &&
+                escaped != 'r' &&
+                escaped != '\\' &&
+                escaped != '"') {
+                throw LexerError(
+                    "invalid escape sequence",
+                    line_,
+                    column_ - 1
+                );
+            }
+        } else {
+            advance();
+        }
+    }
+
+    if (isAtEnd()) {
+        throw LexerError(
+            "unterminated string",
+            startLine,
+            startColumn
+        );
+    }
+
+    advance(); // Consume closing quote.
+
+    return makeToken(
+        TokenKind::StringLiteral,
+        start,
+        startLine,
+        startColumn
+    );
+}
+
 //------------------------------------------------------------------------ */
 
 // Main tokenization function
+
+Token Lexer::makeToken(
+    TokenKind kind,
+    std::size_t start,
+    std::size_t startLine,
+    std::size_t startColumn
+) {
+    return Token{
+        kind,
+        source_.substr(start, current_ - start),
+        startLine,
+        startColumn
+    };
+}
 
 std::vector<Token> Lexer::tokenize() {
     std::vector<Token> tokens;
@@ -189,6 +522,54 @@ std::vector<Token> Lexer::tokenize() {
         // Number literal.
         if (c >= '0' && c <= '9') {
             tokens.push_back(scanNumber());
+            continue;
+        }
+
+        // Single-line comment.
+        if (c == '/' && peekNext() == '/') {
+            advance();
+            advance();
+
+            while (!isAtEnd() && peek() != '\n') {
+                advance();
+            }
+
+            continue;
+        }
+
+        // Operator.
+        if (c == '+' ||
+            c == '-' ||
+            c == '*' ||
+            c == '/' ||
+            c == '%' ||
+            c == '=' ||
+            c == '!' ||
+            c == '<' ||
+            c == '>' ||
+            c == '&' ||
+            c == '|') {
+            tokens.push_back(scanOperator());
+            continue;
+        }
+
+        // Delimiter.
+        if (c == '(' ||
+            c == ')' ||
+            c == '{' ||
+            c == '}' ||
+            c == '[' ||
+            c == ']' ||
+            c == ',' ||
+            c == ';' ||
+            c == ':') {
+            tokens.push_back(scanDelimiter());
+            continue;
+        }
+
+        // String literal.
+        if (c == '"') {
+            tokens.push_back(scanString());
             continue;
         }
 
